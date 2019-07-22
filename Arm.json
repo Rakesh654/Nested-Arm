@@ -1,0 +1,399 @@
+    {
+        "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+        "contentVersion": "1.0.0.0",
+        "parameters": {
+        "vmName": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "VM name"
+            }
+        },
+        "virtualNetworkName": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Virtual Network"
+            }
+        },
+        "nicName": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Nic Name"
+            }
+        },
+        "vmNameUbuntu": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+            "description": "Vm Name Ubuntu"
+            }
+        },
+        "virtualNetworkNameUbuntu": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Vn Name Ubuntu"
+            }
+        },
+        "nicNameUbuntu": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Nic Name Ubuntu"
+            }
+        }
+    },
+    "variables": {
+        "vmName": "[parameters('vmName')]",
+        "subnet0Name": "subnet0",
+        "publicIPAddressName": "az1000301b1-pip123",
+        "subnet1Ref": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworkName'), variables('subnet0Name'))]",
+        "networkSecurityGroupName": "az1000301b1-nsg1",
+        "storageAccountName": "[concat('az1000301b', uniquestring(resourceGroup().id))]",
+        "storageAccountSku": "Standard_LRS",
+        "storageAccountKind": "Storage",
+        "vmNameU": "[parameters('vmNameUbuntu')]",
+        "subnet0NameU": "subnet1",
+        "publicIPAddressNameU": "spektra-ip1",
+        "subnet1RefU": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworkNameUbuntu'), variables('subnet0NameU'))]",
+        "networkSecurityGroupNameU": "spektra-nsg2",
+        "storageAccountNameU": "[concat('storage', uniquestring(resourceGroup().id))]",
+        "storageAccountSkuU": "Standard_LRS",
+        "storageAccountKindU": "Storage"
+    },
+    "resources": [
+        
+        {
+                "type": "Microsoft.Storage/storageAccounts",
+                "name": "[variables('storageAccountName')]",
+                "apiVersion": "2018-07-01",
+                "sku": {
+                    "name": "[variables('storageAccountSku')]"
+                },
+                "kind": "[variables('storageAccountKind')]",
+                "location": "[resourceGroup().location]",
+                "properties": {
+                }
+        },
+        {
+                "name": "[variables('vmName')]",
+                "type": "Microsoft.Compute/virtualMachines",
+                "apiVersion": "2018-06-01",
+                "location": "Eastus",
+                "dependsOn": [
+                    "[concat('Microsoft.Network/networkInterfaces/', parameters('nicName'))]",
+                    "[concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]"
+                ],
+                "properties": {
+                    "osProfile": {
+                        "computerName": "[variables('vmName')]",
+                        "adminUsername": "Spektra",
+                        "adminPassword": "Spektra_system@123",
+                        "windowsConfiguration": {
+                            "provisionVmAgent": "true"
+                        }
+                    },
+                    "hardwareProfile": {
+                        "vmSize": "Standard_DS1_v2"
+                    },
+                    "storageProfile": {
+                        "imageReference": {
+                            "publisher": "MicrosoftWindowsServer",
+                            "offer": "WindowsServer",
+                            "sku": "2016-Datacenter",
+                            "version": "latest"
+                        },
+                        "osDisk": {
+                            "createOption": "FromImage",
+                            "managedDisk": {
+                                "storageAccountType": "Standard_LRS"
+                            }
+                        },
+                        "dataDisks": [
+                        {
+                                    "name": "datadisk1",
+                                    "diskSizeGB": 500,
+                                    "lun": 0,
+                                    "createOption": "Empty"
+                    }
+                        ]
+                    },
+                    "networkProfile": {
+                        "networkInterfaces": [
+                            {
+                                "properties": {
+                                    "primary": true
+                                },
+                                "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('nicName'))]"
+                            }
+                        ]
+                    },
+                    "diagnosticsProfile": {
+                        "bootDiagnostics": {
+                                "enabled": true,
+                                "storageUri": "[concat('http://',variables('storageAccountName'),'.blob.core.windows.net')]"
+                        }
+                    }
+                }
+        },
+        {
+                "type": "Microsoft.Network/virtualNetworks",
+                "name": "[parameters('virtualNetworkName')]",
+                "apiVersion": "2018-08-01",
+                "location": "Eastus",
+                "comments": "Virtual Network",
+                "properties": {
+                    "addressSpace": {
+                        "addressPrefixes": [
+                            "10.103.0.0/20"
+                        ]
+                    },
+                    "subnets": [
+                        {
+                            "name": "[variables('subnet0Name')]",
+                            "properties": {
+                                "addressPrefix": "10.103.0.0/24"
+                            }
+                        }
+                    ]
+                }
+        },
+        {
+                "name": "[parameters('nicName')]",
+                "type": "Microsoft.Network/networkInterfaces",
+                "apiVersion": "2018-08-01",
+                "location": "EastUs",
+                "comments": "Primary NIC",
+                "dependsOn": [
+                    "[variables('publicIpAddressName')]",
+                    "[variables('networkSecurityGroupName')]",
+                    "[parameters('virtualNetworkName')]"
+                ],
+                "properties": {
+                    "ipConfigurations": [
+                        {
+                            "name": "ipconfig1",
+                            "properties": {
+                                "subnet": {
+                                    "id": "[variables('subnet1Ref')]"
+                                },
+                                "privateIPAllocationMethod": "Dynamic",
+                                "publicIpAddress": {
+                                    "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName'))]"
+                                }
+                            }
+                        }
+                    ],
+                    "networkSecurityGroup": {
+                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+                    }
+                }
+        },
+        {
+                "name": "[variables('publicIpAddressName')]",
+                "type": "Microsoft.Network/publicIPAddresses",
+                "apiVersion": "2018-08-01",
+                "location": "Eastus",
+                "comments": "Public IP for Primary NIC",
+                "properties": {
+                    "publicIPAllocationMethod": "Static"
+                }
+        },
+        {
+                "name": "[variables('networkSecurityGroupName')]",
+                "type": "Microsoft.Network/networkSecurityGroups",
+                "apiVersion": "2018-08-01",
+                "location": "Eastus",
+                "comments": "Network Security Group (NSG) for Primary NIC",
+                "properties": {
+                    "securityRules": [
+                        {
+                            "name": "default-allow-rdp",
+                            "properties": {
+                                "priority": 1000,
+                                "sourceAddressPrefix": "*",
+                                "protocol": "Tcp",
+                                "destinationPortRange": "3389",
+                                "access": "Allow",
+                                "direction": "Inbound",
+                                "sourcePortRange": "*",
+                                "destinationAddressPrefix": "*"
+                        }
+                    }
+                ]
+            }
+        },
+
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[variables('storageAccountNameU')]",
+            "apiVersion": "2018-07-01",
+            "sku": {
+                "name": "[variables('storageAccountSkuU')]"
+            },
+            "kind": "[variables('storageAccountKindU')]",
+            "location": "Eastus",
+            "properties": {
+            }
+    },
+    {
+            "name": "[variables('vmNameU')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2018-06-01",
+            "location": "westus",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkInterfaces/', parameters('nicNameUbuntu'))]",
+                "[concat('Microsoft.Storage/storageAccounts/', variables('storageAccountNameU'))]"
+            ],
+            "properties": {
+                "osProfile": {
+                    "computerName": "[variables('vmNameU')]",
+                    "adminUsername": "Spektra",
+                    "adminPassword": "Spektra_system@123"
+                    
+                },
+                "hardwareProfile": {
+                    "vmSize": "Standard_DS1_v2"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "Canonical",
+                        "offer": "UbuntuServer",
+                        "sku": "16.04-LTS",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "Standard_LRS"
+                        }
+                    },
+                    "dataDisks": [
+                    {
+                                "name": "datadisk2",
+                                "diskSizeGB": 100,
+                                "lun": 0,
+                                "createOption": "Empty"
+                }
+                    ]
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "properties": {
+                                "primary": true
+                            },
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('nicNameUbuntu'))]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                            "enabled": true,
+                            "storageUri": "[concat('http://',variables('storageAccountNameU'),'.blob.core.windows.net')]"
+                    }
+                }
+            }
+    },
+    {
+            "type": "Microsoft.Network/virtualNetworks",
+            "name": "[parameters('virtualNetworkNameUbuntu')]",
+            "apiVersion": "2018-08-01",
+            "location": "westus",
+            "comments": "Virtual Network",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.103.0.0/20"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('subnet0NameU')]",
+                        "properties": {
+                            "addressPrefix": "10.103.0.0/24"
+                        }
+                    }
+                ]
+            }
+    },
+    {
+            "name": "[parameters('nicNameUbuntu')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2018-08-01",
+            "location": "westus",
+            "comments": "Primary NIC",
+            "dependsOn": [
+                "[variables('publicIpAddressNameU')]",
+                "[variables('networkSecurityGroupNameU')]",
+                "[parameters('virtualNetworkNameUbuntu')]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig2",
+                        "properties": {
+                            "subnet": {
+                                "id": "[variables('subnet1RefU')]"
+                            },
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIpAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressNameU'))]"
+                            }
+                        }
+                    }
+                ],
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupNameU'))]"
+                }
+            }
+    },
+    {
+            "name": "[variables('publicIpAddressNameU')]",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2018-08-01",
+            "location": "westus",
+            "comments": "Public IP for Primary NIC",
+            "properties": {
+                "publicIPAllocationMethod": "Static"
+            }
+    },
+    {
+            "name": "[variables('networkSecurityGroupNameU')]",
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2018-08-01",
+            "location": "westus",
+            "comments": "Network Security Group (NSG) for Primary NIC",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "default-allow-rdp",
+                        "properties": {
+                            "priority": 1000,
+                            "sourceAddressPrefix": "*",
+                            "protocol": "Tcp",
+                            "destinationPortRange": "3389",
+                            "access": "Allow",
+                            "direction": "Inbound",
+                            "sourcePortRange": "*",
+                            "destinationAddressPrefix": "*"
+                    }
+                }
+            ]
+        }
+    }  
+    ],
+    
+    "outputs": {
+        "Windows VM IP Address": {
+        "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses',variables('publicIpAddressName'))).ipAddress]",
+        "type": "string"
+        },
+        "Ubuntu VM IP Address": {
+        "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses',variables('publicIpAddressNameU'))).ipAddress]",
+        "type": "string"
+        }
+    }
+    }
